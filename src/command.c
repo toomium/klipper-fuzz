@@ -21,7 +21,7 @@ command_encode_ptr(void *p)
 {
     if (sizeof(size_t) > sizeof(uint32_t))
         if (p >= 4096) {
-            shutdown("Invalid Pointer.")
+            shutdown("Invalid pointer range")
         }
         return p - console_receive_buffer();
     return (size_t)p;
@@ -32,7 +32,7 @@ command_decode_ptr(uint32_t v)
 {
     if (sizeof(size_t) > sizeof(uint32_t))
         if (v >= 4096) {
-            shutdown("Invalid Pointer.")
+            shutdown("Invalid pointer range")
         }
         return console_receive_buffer() + v;
     return (void*)(size_t)v;

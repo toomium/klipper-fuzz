@@ -13,4 +13,7 @@ LDFLAGS += -fsanitize=fuzzer
 CFLAGS_klipper.elf += -lutil -lrt -lpthread
 
 
-override CC=afl-clang-fast
+CC=afl-clang-fast
+
+docker:
+	cd test/fuzzing && sudo docker build . -t klipper-fuzz

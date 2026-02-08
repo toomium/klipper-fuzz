@@ -5,6 +5,7 @@
 // This file may be distributed under the terms of the GNU GPLv3 license.
 
 #include <stdarg.h> // va_start
+#include <stdlib.h> // exit
 #include <string.h> // memcpy
 #include "board/io.h" // readb
 #include "board/irq.h" // irq_poll
@@ -19,6 +20,9 @@ static uint32_t
 command_encode_ptr(void *p)
 {
     if (sizeof(size_t) > sizeof(uint32_t))
+        if (p >= 4096) {
+            shutdown("Invalid Pointer.")
+        }
         return p - console_receive_buffer();
     return (size_t)p;
 }
@@ -27,6 +31,9 @@ void *
 command_decode_ptr(uint32_t v)
 {
     if (sizeof(size_t) > sizeof(uint32_t))
+        if (v >= 4096) {
+            shutdown("Invalid Pointer.")
+        }
         return console_receive_buffer() + v;
     return (void*)(size_t)v;
 }
@@ -126,7 +133,11 @@ command_parsef(uint8_t *p, uint8_t *maxend
     }
     return p;
 error:
+#ifndef FUZZING
     shutdown("Command parser error");
+#else
+    exit(1);
+#endif
 }
 
 // Encode a message
@@ -190,7 +201,11 @@ command_encodef(uint8_t *buf, const struct command_encoder *ce, va_list args)
     }
     return p - buf + MESSAGE_TRAILER_SIZE;
 error:
+#ifndef FUZZING
     shutdown("Message encode error");
+#else
+    exit(1);
+#endif
 }
 
 // Add header and trailer bytes to a message block
@@ -221,6 +236,7 @@ static uint8_t in_sendf;
 void
 command_sendf(const struct command_encoder *ce, ...)
 {
+#ifndef FUZZING
     if (readb(&in_sendf))
         // This sendf call was made from an irq handler while the main
         // code was already in sendf - just drop this sendf request.
@@ -233,6 +249,9 @@ command_sendf(const struct command_encoder *ce, ...)
     va_end(args);
 
     writeb(&in_sendf, 0);
+#else
+    return;
+#endif
 }
 
 void
@@ -285,8 +304,10 @@ command_find_block(uint8_t *buf, uint_fast8_t buf_len, uint_fast8_t *pop_count)
     uint16_t msgcrc = ((buf[msglen-MESSAGE_TRAILER_CRC] << 8)
                        | buf[msglen-MESSAGE_TRAILER_CRC+1]);
     uint16_t crc = crc16_ccitt(buf, msglen-MESSAGE_TRAILER_SIZE);
+#ifndef FUZZING
     if (crc != msgcrc)
         goto error;
+#endif
     sync_state &= ~CF_NEED_VALID;
     *pop_count = msglen;
     // Check sequence number
@@ -320,7 +341,9 @@ need_sync: ;
         return -1;
     sync_state |= CF_NEED_VALID;
 nak:
+#ifndef FUZZING
     command_sendf(&encode_acknak);
+#endif
     return -1;
 }
 
@@ -335,11 +358,13 @@ command_dispatch(uint8_t *buf, uint_fast8_t msglen)
         const struct command_parser *cp = command_lookup_parser(cmdid);
         uint32_t args[READP(cp->num_args)];
         p = command_parsef(p, msgend, cp, args);
+#ifndef FUZZING
         if (sched_is_shutdown() && !(READP(cp->flags) & HF_IN_SHUTDOWN)) {
             sched_report_shutdown();
             continue;
         }
         irq_poll();
+#endif
         void (*func)(uint32_t*) = READP(cp->func);
         func(args);
     }
@@ -360,7 +385,9 @@ command_find_and_dispatch(uint8_t *buf, uint_fast8_t buf_len
     int_fast8_t ret = command_find_block(buf, buf_len, pop_count);
     if (ret > 0) {
         command_dispatch(buf, *pop_count);
+#ifndef FUZZING
         command_send_ack();
+#endif
     }
     return ret;
 }

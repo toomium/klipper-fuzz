@@ -267,6 +267,7 @@ irq_restore(irqstatus_t flag)
 void
 irq_wait(void)
 {
+#ifndef FUZZING
     // Must atomically sleep until signaled
     if (!readl(&TimerInfo.must_wake_timers)) {
         timer_disable_signals();
@@ -275,6 +276,7 @@ irq_wait(void)
         timer_enable_signals();
     }
     irq_poll();
+#endif
 }
 
 void

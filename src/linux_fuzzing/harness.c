@@ -13,8 +13,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
 
     memcpy(fuzz_buf, data, size);
 
-    uint_fast8_t pop_count = 0; 
-    command_find_and_dispatch(fuzz_buf, (uint_fast8_t)size, &pop_count);
+    command_dispatch(fuzz_buf, (uint_fast8_t)size);
 
     return 0;
 }

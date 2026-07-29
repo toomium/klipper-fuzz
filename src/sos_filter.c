@@ -134,7 +134,7 @@ command_sos_filter_set_section(uint32_t *args)
     // setting a section marks the filter as inactive
     sf->n_sections = 0;
     uint8_t section_idx = args[1];
-    validate_section_index(sf, section_idx);
+    //validate_section_index(sf, section_idx);
     // copy section data
     uint8_t arg_base = 2;
     for (uint8_t i = 0; i < SECTION_WIDTH; i++) {

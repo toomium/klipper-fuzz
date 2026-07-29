@@ -2,6 +2,7 @@
 #define IPDL_LPM_H
 
 #include <libprotobuf-mutator/src/mutator.h>
+#include <libprotobuf-mutator/src/random.h>
 #include "_mutator_factory.h"
 #include <google/protobuf/descriptor.h>
 #include "compile_time_request.pb.h"
@@ -194,6 +195,37 @@ static size_t convertMultiMessage(const google::protobuf::Message& raw_seq,
     return p - start;
 }
 
+/**
+ * Appends all messages from the "add" protobuf message to the "dest" protobuf message
+ */
+static void appendProtobuf(google::protobuf::Message& dest, const google::protobuf::Message& add) {
+    MultiMessage* seq = 
+    dynamic_cast<MultiMessage*>(&dest);
+
+    const MultiMessage* addSeq = 
+    dynamic_cast<const MultiMessage*>(&add);
+
+    // get messages to append 
+    if (!seq || !addSeq) {
+        fprintf(stderr, "[FUZZ] appendMessages: dynamic_cast failed\n");
+        return;
+    }
+
+    for (int i = 0; i < addSeq->sequence_size(); i++) {
+        const AnyMessage& msg = addSeq->sequence(i);
+        
+        if (msg.content_case() == AnyMessage::CONTENT_NOT_SET) {
+            continue;
+        }
+        
+        *seq->add_sequence() = msg; 
+    }
+
+    if (g_debug) {
+        fprintf(stderr, "[FUZZ] Appended %d messages, total now: %d\n",
+            addSeq->sequence_size(), seq->sequence_size());
+    }
+}
 
 // base class
 class MyMutatorBase {
@@ -225,6 +257,9 @@ public:
     virtual void print() = 0;
     virtual void clear() = 0;
     virtual size_t convertToKlipper(uint8_t *buf, size_t max_size) = 0;
+    virtual std::minstd_rand getRandom() = 0;
+    virtual void appendMessages(MyMutatorBase& other) = 0;
+    virtual google::protobuf::Message* getProto() = 0;
 };
  
 
@@ -253,6 +288,9 @@ public:
     void clear(){
         proto.Clear();
     }
+    google::protobuf::Message* getProto(){
+        return &this->proto;
+    }
     void print(){
         std::cout << proto.DebugString() << "\n";
     }
@@ -261,6 +299,13 @@ public:
     }
     void seed(unsigned int seed) {
         this->Seed(seed);
+    }
+    std::minstd_rand getRandom() {
+        return static_cast<std::minstd_rand>(*this->random());
+    }
+
+    void appendMessages(MyMutatorBase& other) {
+        appendProtobuf(this->proto, *other.getProto());
     }
 };
 

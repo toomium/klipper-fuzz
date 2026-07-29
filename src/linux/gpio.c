@@ -68,6 +68,7 @@ get_chip_fd(uint8_t chipId)
 struct gpio_out
 gpio_out_setup(uint32_t pin, uint8_t val)
 {
+    if (pin >= ARRAY_SIZE(gpio_lines)) shutdown("Not an output pin");
     struct gpio_line *line = &gpio_lines[pin];
     line->offset = GPIO2PIN(pin);
     line->chipid = GPIO2PORT(pin);

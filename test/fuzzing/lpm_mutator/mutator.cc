@@ -1,4 +1,5 @@
 #include <libprotobuf-mutator/src/mutator.h>
+#include <libprotobuf-mutator/src/random.h>
 
 #include <iostream>
 #include <sstream>
@@ -109,6 +110,20 @@ extern "C" size_t afl_custom_fuzz(MyMutatorBase *mutator, // return value from a
     if (g_debug) {
         fprintf(stderr, "[FUZZ] Before mutations:\n");
         mutator->print();
+    }
+
+    if (!mutator->isSingleFuzzingMode
+        && add_buf != nullptr
+        && add_buf_size > 0
+        && (mutator->getRandom()() % 100) < 40)
+    {
+        MyMutatorBase* tmp = getMutator(mutator->msg_id);
+
+        if (tmp->parse(add_buf, add_buf_size)) {
+            mutator->appendMessages(*tmp);
+            if (g_debug) fprintf(stderr, "[FUZZ] Spliced add_buf messages into sequence\n");
+        }
+        delete tmp;
     }
 
     // mutate protobuf
